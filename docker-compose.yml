@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: forex_bot_db
+    environment:
+      POSTGRES_USER: forex_user
+      POSTGRES_PASSWORD: secure_password_123
+      POSTGRES_DB: forex_bot_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - forex_bot_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forex_user"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: forex_bot_api
+    environment:
+      DATABASE_URL: postgresql+asyncpg://forex_user:secure_password_123@postgres:5432/forex_bot_db
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
+      EXNESS_LOGIN: ${EXNESS_LOGIN}
+      EXNESS_PASSWORD: ${EXNESS_PASSWORD}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - forex_bot_network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+volumes:
+  postgres_data:
+
+networks:
+  forex_bot_network:
+    driver: bridge
